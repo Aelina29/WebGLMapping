@@ -200,14 +200,16 @@ uniform lowp int uShading;
 uniform lowp int uLightModel;
 uniform float uLightShininess;
 
+uniform sampler2D uSamplerMap;
 uniform sampler2D uSampler;
 uniform float uStepSize;
 ${shaderFunctions}
 void main(void) {
     float uStepSize = 0.00390625;
+    //float uStepSize = 0.001953125;
 
-    vec3 xGradient = texture2D(uSampler, vec2(vTextureCoord.x - uStepSize, vTextureCoord.y)).xyz - texture2D(uSampler, vec2(vTextureCoord.x + uStepSize, vTextureCoord.y)).xyz;
-    vec3 yGradient = texture2D(uSampler, vec2(vTextureCoord.x, vTextureCoord.y - uStepSize)).xyz - texture2D(uSampler, vec2(vTextureCoord.x, vTextureCoord.y + uStepSize)).xyz;
+    vec3 xGradient = texture2D(uSamplerMap, vec2(vTextureCoord.x - uStepSize, vTextureCoord.y)).xyz - texture2D(uSamplerMap, vec2(vTextureCoord.x + uStepSize, vTextureCoord.y)).xyz;
+    vec3 yGradient = texture2D(uSamplerMap, vec2(vTextureCoord.x, vTextureCoord.y - uStepSize)).xyz - texture2D(uSamplerMap, vec2(vTextureCoord.x, vTextureCoord.y + uStepSize)).xyz;
     vec3 normalMap = vNormal + vTextureCoord.x * xGradient + vTextureCoord.y * yGradient;
     vec3 N =  normalize(normalMap * 2.0 - 1.0);
 
@@ -223,14 +225,13 @@ void main(void) {
         lightDirection, positionEye3, uLightPower, uLightShininess);
     light = dampLight(uDampingFunction, light);
 
+    
+    //gl_FragColor = texture2D(uSampler, vTextureCoord);
     gl_FragColor = vec4(1.0, 0.5, 0.0, 1.0); //vColor;
     gl_FragColor.rgb *= light;
 
-    
-    //gl_FragColor = vec4(gl_FragColor.rgb + 0.9 * vec3(0.5, 0.3, 0.01), 1.0);
-    //gl_FragColor.rgb = vec3(gl_FragColor.rgb + 0.9 * vec3(0.5, 0.3, 0.01));    
-    //gl_FragColor = gl_FragColor + vec4(0.9 * vec3(0.5, 0.3, 0.01), 1.0);
     gl_FragColor = gl_FragColor + vec4(0.9 * vec3(0.5, 0.3, 0.01), 0.01);
+    //gl_FragColor = gl_FragColor + vec4(0.9 * vec3(0.9, 0.8, 0.9), 0.01);
 }`
 
 //lighting==================================================================================
@@ -244,7 +245,7 @@ const sceneState = {
     lightDiffuse: NaN,
     lightSpecular: NaN,
 
-    lightShininess: NaN,    
+    lightShininess: NaN,
 }
 function update() {
     sceneState.lightPower = parseFloat(document.querySelector('#lightPower').value);
@@ -308,6 +309,7 @@ class Scene {
                 projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
                 modelViewMatrix: this.gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
 
+                samplerMap: this.gl.getUniformLocation(shaderProgram, 'uSamplerMap'),
                 sampler: this.gl.getUniformLocation(shaderProgram, 'uSampler'),
                 stepSize: this.gl.getUniformLocation(shaderProgram, 'uStepSize'),
 
@@ -335,9 +337,9 @@ class Scene {
 
     start() {
         const textureMap = loadTexture(this.gl, imageMap.src);
-        const textureKatarina = loadTexture(this.gl, imageMap.src);
+        const textureKatarina = loadTexture(this.gl, texKatarina.src);
         const render = () => {
-            this.drawScene([textureMap ]);
+            this.drawScene([textureMap, textureKatarina]);
             requestAnimationFrame(render);
         }
         requestAnimationFrame(render);
@@ -372,10 +374,15 @@ class Scene {
                 
                 obj.setVertexes(this.programInfo);
                 
-                // Указываем WebGL, что мы используем текстурный регистр 1
+                // Указываем WebGL, что мы используем текстурный регистр 0 для Mapping
                 this.gl.activeTexture(this.gl.TEXTURE0);
                 // Связываем текстуру с регистром
-                this.gl.bindTexture(this.gl.TEXTURE_2D, textures[i]);
+                this.gl.bindTexture(this.gl.TEXTURE_2D, textures[0]);
+                
+                // Указываем WebGL, что мы используем текстурный регистр 1
+                this.gl.activeTexture(this.gl.TEXTURE1);
+                // Связываем текстуру с регистром
+                this.gl.bindTexture(this.gl.TEXTURE_2D, textures[1]);
 
                 const buffers = obj.getBuffers();
                 this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.full);
@@ -383,7 +390,8 @@ class Scene {
                 this.gl.uniformMatrix4fv(this.programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
                 this.gl.uniformMatrix4fv(this.programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
 
-                this.gl.uniform1i(this.programInfo.uniformLocations.sampler, 0);
+                this.gl.uniform1i(this.programInfo.uniformLocations.samplerMap, 0);
+                this.gl.uniform1i(this.programInfo.uniformLocations.sampler, 1);
                 this.gl.uniform1i(this.programInfo.uniformLocations.stepSize, stepSize);
 
                 this.gl.uniform1f(this.programInfo.uniformLocations.lightPower, this.state.lightPower);
